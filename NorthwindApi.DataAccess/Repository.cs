@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
-using System.Text;
 
 namespace NorthwindApi.DataAccess
 {
@@ -11,28 +10,55 @@ namespace NorthwindApi.DataAccess
     {
         const string ConnectionString = @"Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=Northwind;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=False;ApplicationIntent=ReadWrite;MultiSubnetFailover=False";
 
+        #region Get Methods
         public List<Invoice> GetAllInvoices(string customerID)
         {
-            string sql = $"SELECT CustomerName, ExtendedPrice, Freight FROM Invoices WHERE CustomerID LIKE '{customerID}'";
-            DataRowCollection dataRows = Execute(sql);
+            string query = $"SELECT CustomerName, ExtendedPrice, Freight FROM Invoices WHERE CustomerID LIKE '{customerID}'";
+            DataRowCollection dataRows = Execute(query);
             List<Invoice> invoices = ProcessInvoices(dataRows);
             return invoices;
         }
 
         public List<Customer> GetAllCustomers()
         {
-            string sql = "SELECT DISTINCT CustomerID FROM Customers";
-            DataRowCollection dataRows = Execute(sql);
+            string query = "SELECT DISTINCT CustomerID FROM Customers";
+            DataRowCollection dataRows = Execute(query);
             List<Customer> customers = ProcessCustomers(dataRows);
             return customers;
         }
 
-        private DataRowCollection Execute(string sql)
+        public List<Order> GetAllOrders(string customerId)
+        {
+            string query = $"SELECT CustomerID, OrderDate, RequiredDate, ShippedDate, ShipAddress, ShipCountry FROM Orders WHERE CustomerID LIKE '{customerId}'";
+            DataRowCollection datarows = Execute(query);
+            List<Order> orders = ProcessOrders(datarows);
+            return orders;
+        }
+
+        public List<Order> GetPendingOrders(string customerId)
+        {
+            string query = $"SELECT CustomerID, OrderDate, RequiredDate, ShippedDate, ShipAddress, ShipCountry FROM Orders WHERE ShippedDate IS NULL AND CustomerID = '{customerId}'";
+            DataRowCollection datarows = Execute(query);
+            List<Order> orders = ProcessOrders(datarows);
+            return orders;
+        }
+
+        public List<Order> GetCompletedOrders(string customerId)
+        {
+            string query = $"SELECT CustomerID, OrderDate, RequiredDate, ShippedDate, ShipAddress, ShipCountry FROM Orders WHERE ShippedDate IS NOT NULL AND CustomerID = '{customerId}'";
+            DataRowCollection datarows = Execute(query);
+            List<Order> orders = ProcessOrders(datarows);
+            return orders;
+        }
+        #endregion
+
+        #region Execute Query Method
+        private DataRowCollection Execute(string query)
         {
             try
             {
                 DataSet resultSet = new DataSet();
-                using(SqlDataAdapter adapter = new SqlDataAdapter(new SqlCommand(sql, new SqlConnection(ConnectionString))))
+                using(SqlDataAdapter adapter = new SqlDataAdapter(new SqlCommand(query, new SqlConnection(ConnectionString))))
                 {
                     adapter.Fill(resultSet);
                 }
@@ -43,7 +69,9 @@ namespace NorthwindApi.DataAccess
                 throw;
             }
         }
+        #endregion
 
+        #region Process Methods
         private List<Customer> ProcessCustomers(DataRowCollection dataRows)
         {
             List<Customer> customers = new List<Customer>();
@@ -69,5 +97,23 @@ namespace NorthwindApi.DataAccess
             }
             return invoices;
         }
+
+        private List<Order> ProcessOrders(DataRowCollection datarows)
+        {
+            List<Order> orders = new List<Order>();
+            foreach(DataRow row in datarows)
+            {
+                string customerID = (string)row["CustomerID"];
+                DateTime orderDate = (DateTime)row["OrderDate"];
+                DateTime requiredDate = (DateTime)row["RequiredDate"];
+                DateTime shippedDate = Convert.IsDBNull(row["ShippedDate"]) ? DateTime.MinValue : (DateTime)row["ShippedDate"];
+                string shipAddress = (string)row["ShipAddress"];
+                string shipCountry = (string)row["ShipCountry"];
+                Order order = new Order(customerID, orderDate, requiredDate, shippedDate, shipAddress, shipCountry);
+                orders.Add(order);
+            }
+            return orders;
+        } 
+        #endregion
     }
-}
+}   
